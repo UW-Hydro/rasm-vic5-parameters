@@ -3,7 +3,7 @@
 #PBS -q serial
 #PBS -A NPSCA07935YF5
 #PBS -l select=2:ncpus=32:mpiprocs=8:mem=200GB
-#PBS -l walltime=16:00:00
+#PBS -l walltime=18:00:00
 #PBS -j oe
 #PBS -M gergel@uw.edu
 #PBS -m abe
@@ -13,7 +13,7 @@ source activate pangeo
 
 # process soil grid NetCDFs by cropping them and then regridding them
 
-declare -a soil_variables=("bulk_density" "clay" "sand" "silt" "coarse" "organic_fract")
+declare -a soil_variables=("clay" "sand" "silt" "coarse" "bulk_density" "organic_fract")
 ###################################################################################### change domain file if needed ###########################################################
 domain_file="/u/home/gergel/data/parameters/domain.lnd.wr50a_ar9v4.100920.nc"
 ###############################################################################################################################################################################
@@ -30,11 +30,11 @@ do
 		
 		# crop file
 		crop_file="/u/home/gergel/data/parameters/soil_data/netcdfs/cropped_${soil_var}_sl${layer}.nc"
-		cdo sellonlatbox,-180,180,16.5,90 $filename $crop_file
+		cdo sellonlatbox,-180,180,15,90 $filename $crop_file
 
 		# regrid file
-		tmp1="/u/home/gergel/data/parameters/soil_data/rasm_grid_netcdfs/50km/${soil_var}_${month_num}_tmp.nc"
-		tmp2="/u/home/gergel/data/parameters/soil_data/rasm_grid_netcdfs/50km/${soil_var}_${month_num}_wr50a_ar9v4_tmp.nc"
+		tmp1="/u/home/gergel/data/parameters/soil_data/rasm_grid_netcdfs/50km/${soil_var}_sl${layer}_tmp.nc"
+		tmp2="/u/home/gergel/data/parameters/soil_data/rasm_grid_netcdfs/50km/${soil_var}_sl${layer}_wr50a_ar9v4_tmp.nc"
 		regrid_file="/u/home/gergel/data/parameters/soil_data/rasm_grid_netcdfs/50km/${soil_var}_sl${layer}_wr50a_ar9v4.nc"
 		
 		# set fillvalues to missing values to avoid incorrect remapping of coastal gridcells, 
@@ -46,6 +46,7 @@ do
 			vmin=50
 			vmax=3000
 		elif [ "$soil_var" == "organic_fract" ]
+		then
 			# soil organic carbon content (g/kg)
 			vmin=0
 			vmax=500
