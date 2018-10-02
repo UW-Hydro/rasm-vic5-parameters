@@ -10,4 +10,4 @@
 
 source activate pangeo
 
-python /u/home/gergel/scripts/batch_convert_soilgrid_geotiff_to_netcdf.py 
+python /u/home/gergel/scripts/rasm-vic5-parameters/batch_convert_soilgrid_geotiff_to_netcdf.py 
