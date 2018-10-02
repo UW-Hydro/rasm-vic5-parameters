@@ -1,8 +1,8 @@
 #!/bin/bash
-#PBS -N regrid
-#PBS -q serial
+#PBS -N soil
+#PBS -q parallel
 #PBS -A NPSCA07935YF5
-#PBS -l select=2:ncpus=32:mpiprocs=8:mem=200GB
+#PBS -l select=4:ncpus=32:mpiprocs=8:mem=200GB
 #PBS -l walltime=18:00:00
 #PBS -j oe
 #PBS -M gergel@uw.edu
@@ -12,10 +12,27 @@
 source activate pangeo
 
 # process soil grid NetCDFs by cropping them and then regridding them
+declare -a soil_variables=("bulk_density" "organic_fract")
+#declare -a soil_variables=("clay" "sand" "silt" "coarse" "bulk_density" "organic_fract")
 
-declare -a soil_variables=("clay" "sand" "silt" "coarse" "bulk_density" "organic_fract")
-###################################################################################### change domain file if needed ###########################################################
-domain_file="/u/home/gergel/data/parameters/domain.lnd.wr50a_ar9v4.100920.nc"
+# grid options: 50km: wr50a_ar9v4, 25km: wr25b_ar9v4
+grid="wr25b_ar9v4"
+# res options: 50km, 25km 
+res="25km"
+
+if [ "$grid" == "wr50a_ar9v4" ]
+then
+	domain_file="/u/home/gergel/data/parameters/domain.lnd.wr50a_ar9v4.100920.nc"
+elif [ "$grid" == "wr25b_ar9v4" ]
+then
+	domain_file="/u/home/gergel/data/parameters/domain.lnd.wr25b_ar9v4.170413.nc"
+else
+	echo "this hasn't been defined yet"
+fi
+
+echo "grid is ${grid}"
+echo "using $domain_file for regridding"
+	
 ###############################################################################################################################################################################
 
 for soil_var in ${soil_variables[@]} 
@@ -33,9 +50,9 @@ do
 		cdo sellonlatbox,-180,180,15,90 $filename $crop_file
 
 		# regrid file
-		tmp1="/u/home/gergel/data/parameters/soil_data/rasm_grid_netcdfs/50km/${soil_var}_sl${layer}_tmp.nc"
-		tmp2="/u/home/gergel/data/parameters/soil_data/rasm_grid_netcdfs/50km/${soil_var}_sl${layer}_wr50a_ar9v4_tmp.nc"
-		regrid_file="/u/home/gergel/data/parameters/soil_data/rasm_grid_netcdfs/50km/${soil_var}_sl${layer}_wr50a_ar9v4.nc"
+		tmp1="/u/home/gergel/data/parameters/soil_data/rasm_grid_netcdfs/${res}/${soil_var}_sl${layer}_tmp.nc"
+		tmp2="/u/home/gergel/data/parameters/soil_data/rasm_grid_netcdfs/${res}/${soil_var}_sl${layer}_${grid}_tmp.nc"
+		regrid_file="/u/home/gergel/data/parameters/soil_data/rasm_grid_netcdfs/${res}/${soil_var}_sl${layer}_${grid}.nc"
 		
 		# set fillvalues to missing values to avoid incorrect remapping of coastal gridcells, 
 		# solution adapted from https://code.mpimet.mpg.de/boards/2/topics/6172?r=6199
@@ -60,13 +77,8 @@ do
 		cdo setmisstonn $tmp1 $tmp2		
 
 		# remap both land and ocean gridcells so that coastal gridcells are assigned valid values 
-		# use nearest neighbor remapping for all soil variables except for organic fraction
-		if [ "$soil_var" == "organic_fract" ]
-		then
-			cdo remapcon,$domain_file $tmp2 $regrid_file
-		else
-			cdo remapnn,$domain_file $tmp2 $regrid_file
-		fi
+		# use nearest neighbor remapping for all soil variables
+		cdo remapnn,$domain_file $tmp2 $regrid_file
 
 		echo "successfully regridded ${file_type}_sl${layer}.nc"	
 	
