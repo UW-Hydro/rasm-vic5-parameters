@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import collections
 import warnings 
+import pandas as pd
 from netCDF4 import default_fillvals
 from scipy.stats import hmean
 
@@ -501,3 +502,109 @@ def calculate_init_moist(porosity, soil_layer_depth):
     init_moist = porosity * soil_layer_depth * MM_PER_M
     
     return(init_moist)
+
+def calculate_baseflow_parameters(domain, hydro_classes, var):
+    '''
+    takes in DataArrays: domain file and hydro_classes
+    str: var name to return
+    Returns: numpy array of var name
+    '''
+    import pandas as pd
+    dir = '/u/home/gergel/data/parameters'
+    soil_filename = 'world.soil.parameter.txt'
+    soil_file = os.path.join(dir, soil_filename)
+
+    masknan_vals = domain['mask'].where(domain['mask'] == 1).values
+    names = ['runflag', 'gridcell', 'lat', 'lon', 'bi', 'd1', 'd2', 'd3', 'd4', 'N1', 'N2', 'N3', 'ksat1', 
+             'ksat2', 'ksat3', 'phi_s1', 'phi_s2', 'phi_s3', 'init_moist1', 'init_moist2', 'init_moist3', 
+             'elevation', 'depth1', 'depth2', 'depth3', 'avg_T', 'dp', 'bubble', 'quartz', 'bulk_density1', 
+             'bulk_density2', 'bulk_density3', 'soil_density1', 'soil_density2', 'soil_density3', 'off_gmt', 
+             'Wcr1', 'Wcr2', 'Wcr3', 'Wp1', 'Wp2', 'Wp3', 'surface_roughness', 'snow_roughness', 'annual_prec', 
+             'residual1', 'residual2', 'residual3'] 
+    soil = pd.read_table(soil_file, delim_whitespace=True, names=names)
+
+    d1 = np.copy(masknan_vals)
+    d2 = np.copy(masknan_vals)
+    d3 = np.copy(masknan_vals)
+    d4 = np.copy(masknan_vals)
+
+    # arid
+    gc = soil.loc[(soil['lat'] > 38) & (soil['lat'] < 40) & (soil['lon'] < 107) & (soil['lon'] > 104)]
+    d1[np.nonzero(hydro_classes['arid'].values)] = gc['d1'].values[0]
+    d2[np.nonzero(hydro_classes['arid'].values)] = gc['d2'].values[0]
+    d3[np.nonzero(hydro_classes['arid'].values)] = gc['d3'].values[0]
+    d4[np.nonzero(hydro_classes['arid'].values)] = gc['d4'].values[0]
+
+    # temperate dry 
+    gc = soil.loc[(soil['lat'] > 30) & (soil['lat'] < 32) & (soil['lon'] < 116) & (soil['lon'] > 114)]
+    d1[np.nonzero(hydro_classes['temperate_dry'].values)] = gc['d1'].values[0]
+    d2[np.nonzero(hydro_classes['temperate_dry'].values)] = gc['d2'].values[0]
+    d3[np.nonzero(hydro_classes['temperate_dry'].values)] = gc['d3'].values[0]
+    d4[np.nonzero(hydro_classes['temperate_dry'].values)] = gc['d4'].values[0]
+
+    # cold_dry_perma
+    gc = soil.loc[(soil['lat'] > 55) & (soil['lat'] < 59) & (soil['lon'] < 118) & (soil['lon'] > 115)]
+    d1[np.nonzero(hydro_classes['cold_dry_perma'].values)] = gc['d1'].values[0]
+    d2[np.nonzero(hydro_classes['cold_dry_perma'].values)] = gc['d2'].values[0]
+    d3[np.nonzero(hydro_classes['cold_dry_perma'].values)] = gc['d3'].values[0]
+    d4[np.nonzero(hydro_classes['cold_dry_perma'].values)] = gc['d4'].values[0]
+
+    # cold_dry_noperma
+    gc = soil.loc[(soil['lat'] > 59) & (soil['lat'] < 62) & (soil['lon'] < 144) & (soil['lon'] > 141)]
+    d1[np.nonzero(hydro_classes['cold_dry_noperma'].values)] = gc['d1'].values[0]
+    d2[np.nonzero(hydro_classes['cold_dry_noperma'].values)] = gc['d2'].values[0]
+    d3[np.nonzero(hydro_classes['cold_dry_noperma'].values)] = gc['d3'].values[0]
+    d4[np.nonzero(hydro_classes['cold_dry_noperma'].values)] = gc['d4'].values[0]
+
+    # cold_wds_ws_perma
+    gc = soil.loc[(soil['lat'] > 46) & (soil['lat'] < 49) & (soil['lon'] < -117) & (soil['lon'] > -120)]
+    d1[np.nonzero(hydro_classes['cold_wds_ws_perma'].values)] = gc['d1'].values[0]
+    d2[np.nonzero(hydro_classes['cold_wds_ws_perma'].values)] = gc['d2'].values[0]
+    d3[np.nonzero(hydro_classes['cold_wds_ws_perma'].values)] = gc['d3'].values[0]
+    d4[np.nonzero(hydro_classes['cold_wds_ws_perma'].values)] = gc['d4'].values[0]
+
+    # cold_wds_ws_noperma
+    gc = soil.loc[(soil['lat'] > 52) & (soil['lat'] < 54) & (soil['lon'] < 36) & (soil['lon'] > 34)]
+    d1[np.nonzero(hydro_classes['cold_wds_ws_noperma'].values)] = gc['d1'].values[0]
+    d2[np.nonzero(hydro_classes['cold_wds_ws_noperma'].values)] = gc['d2'].values[0]
+    d3[np.nonzero(hydro_classes['cold_wds_ws_noperma'].values)] = gc['d3'].values[0]
+    d4[np.nonzero(hydro_classes['cold_wds_ws_noperma'].values)] = gc['d4'].values[0]
+
+    # cold_wds_cs_perma
+    gc = soil.loc[(soil['lat'] > 63) & (soil['lat'] < 66) & (soil['lon'] < 162) & (soil['lon'] > 159)]
+    d1[np.nonzero(hydro_classes['cold_wds_cs_perma'].values)] = gc['d1'].values[0]
+    d2[np.nonzero(hydro_classes['cold_wds_cs_perma'].values)] = gc['d2'].values[0]
+    d3[np.nonzero(hydro_classes['cold_wds_cs_perma'].values)] = gc['d3'].values[0]
+    d4[np.nonzero(hydro_classes['cold_wds_cs_perma'].values)] = gc['d4'].values[0]
+
+    # cold_wds_cs_noperma
+    gc = soil.loc[(soil['lat'] > 60) & (soil['lat'] < 63) & (soil['lon'] < 24) & (soil['lon'] > 22)]
+    d1[np.nonzero(hydro_classes['cold_wds_cs_noperma'].values)] = gc['d1'].values[0]
+    d2[np.nonzero(hydro_classes['cold_wds_cs_noperma'].values)] = gc['d2'].values[0]
+    d3[np.nonzero(hydro_classes['cold_wds_cs_noperma'].values)] = gc['d3'].values[0]
+    d4[np.nonzero(hydro_classes['cold_wds_cs_noperma'].values)] = gc['d4'].values[0]
+
+    # polar
+    gc = soil.loc[(soil['lat'] > 68) & (soil['lat'] < 71) & (soil['lon'] < -69) & (soil['lon'] > -73)]
+    d1[np.nonzero(hydro_classes['polar'].values)] = gc['d1'].values[0]
+    d2[np.nonzero(hydro_classes['polar'].values)] = gc['d2'].values[0]
+    d3[np.nonzero(hydro_classes['polar'].values)] = gc['d3'].values[0]
+    d4[np.nonzero(hydro_classes['polar'].values)] = gc['d4'].values[0]
+
+    if var == "d1":
+        return(d1)
+    elif var == "d2":
+        return(d2)
+    elif var == "d3":
+        return(d3)
+    elif var == "d4":
+        return(d4)
+
+def pick_dominant_pft(gridcell_pfts):
+    '''
+    takes in the 17 PFTs for a gridcell and picks the one that is largest if 
+    `return_var` == `largest_pft`. If `return_var` == `dominant_pft_class`, then 
+    it returns the number of the PFT that corresponds to the dominant class
+    '''
+    
+    return(np.argmax(gridcell_pfts))
