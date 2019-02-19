@@ -259,7 +259,19 @@ def calculate_nveg_pfts(gridcell_pfts):
     takes in the 17 PFTs for a gridcell and returns the number of active veg types for that gridcell,
     e.g. the number of PCT_PFTs that is greater than 0
     '''
-    return(np.count_nonzero(gridcell_pfts))
+    active_pfts = np.count_nonzero(gridcell_pfts[1:])
+    if gridcell_pfts[0] == 100 and active_pfts == 0:
+        # this is a pure bare soil gridcell
+        return(0)
+    elif gridcell_pfts[0] == 100 and active_pfts > 0: 
+        # this is a bare soil gridcell but has a nonzero fraction active 
+        # of another veg type 
+        # this is essentially the rounding error case
+        return(active_pfts)
+    else: 
+        # not bare soil
+        active_pfts = np.count_nonzero(gridcell_pfts[1:])
+        return(active_pfts)
 
 def map_pft_to_nldas_class(pft):
     '''
@@ -503,16 +515,16 @@ def calculate_init_moist(porosity, soil_layer_depth):
     
     return(init_moist)
 
-def calculate_baseflow_parameters(domain, hydro_classes, var):
+def calculate_baseflow_parameters(domain, inputdata, hydro_classes, var):
     '''
     takes in DataArrays: domain file and hydro_classes
     str: var name to return
     Returns: numpy array of var name
     '''
     import pandas as pd
-    dir = '/u/home/gergel/data/parameters'
+    # dir = '/u/home/gergel/data/parameters'
     soil_filename = 'world.soil.parameter.txt'
-    soil_file = os.path.join(dir, soil_filename)
+    soil_file = os.path.join(inputdata, soil_filename)
 
     masknan_vals = domain['mask'].where(domain['mask'] == 1).values
     names = ['runflag', 'gridcell', 'lat', 'lon', 'bi', 'd1', 'd2', 'd3', 'd4', 'N1', 'N2', 'N3', 'ksat1', 
@@ -608,3 +620,451 @@ def pick_dominant_pft(gridcell_pfts):
     '''
     
     return(np.argmax(gridcell_pfts))
+
+def create_empty_arrays(domain, nj, ni, num_veg):
+   '''
+   takes in DataSet of domain file, scalars for nj and ni 
+   (size of array)
+   '''
+   masknan_vals = domain['mask'].where(domain['mask'] == 1).values
+
+   arr_months = np.rollaxis(np.dstack((masknan_vals, masknan_vals, masknan_vals, masknan_vals, 
+                                    masknan_vals, masknan_vals, masknan_vals, masknan_vals, 
+                                    masknan_vals, masknan_vals, masknan_vals, masknan_vals)), 
+                        axis=2)
+   arr_nlayer = np.rollaxis(np.dstack((masknan_vals, masknan_vals, masknan_vals)), 
+                        axis=2)
+
+   arr_rootzone = np.rollaxis(np.dstack((masknan_vals, masknan_vals)), 
+                        axis=2)
+
+   arr_veg_classes = np.rollaxis(np.dstack((masknan_vals, masknan_vals, masknan_vals, masknan_vals, 
+                                         masknan_vals, masknan_vals, masknan_vals, masknan_vals, 
+                                         masknan_vals, masknan_vals, masknan_vals, masknan_vals, 
+                                         masknan_vals, masknan_vals, masknan_vals, masknan_vals, 
+                                         masknan_vals)), 
+                              axis=2)
+   arr_veg_classes_rootzone = np.vstack((arr_rootzone, arr_rootzone, arr_rootzone, arr_rootzone, 
+                                      arr_rootzone, arr_rootzone, arr_rootzone, arr_rootzone, 
+                                      arr_rootzone, arr_rootzone, arr_rootzone, arr_rootzone, 
+                                      arr_rootzone, arr_rootzone, arr_rootzone,
+                                      arr_rootzone, arr_rootzone)).reshape(num_veg, 2, nj, ni)
+   arr_veg_classes_month = np.vstack((arr_months, arr_months, arr_months, arr_months, arr_months, 
+                                   arr_months, arr_months, arr_months, arr_months, arr_months, 
+                                   arr_months, arr_months, arr_months, arr_months, arr_months, 
+                                   arr_months, arr_months,)).reshape(num_veg, 12, nj, ni)
+   return(arr_months, arr_nlayer, arr_rootzone, arr_veg_classes, arr_veg_classes_rootzone,
+          arr_veg_classes_month)
+
+def create_parameter_dataset(domain, old_params, nj, ni, num_veg,
+			     organic_fract, max_snow_albedo, 
+			     bulk_density_comb): 
+   '''
+   takes in: 
+   returns parameter DataSet
+   '''
+   from netCDF4 import default_fillvals
+   # define fillvals
+   fillval_f = default_fillvals['f8']
+   fillval_i = default_fillvals['i4']
+   
+   masknan_vals = domain['mask'].where(domain['mask'] == 1).values
+
+   arr_months, arr_nlayer, \
+   arr_rootzone, arr_veg_classes, \
+   arr_veg_classes_rootzone, \
+   arr_veg_classes_month = create_empty_arrays(domain, nj, ni, num_veg)
+
+   params = xr.Dataset()
+
+   # assign veg class indexing
+   params['veg_class'] = xr.DataArray(np.arange(1, 18), dims='veg_class', 
+                                   attrs={'long_name': "vegetation class"})
+   params['nlayer'] = xr.DataArray(np.arange(0, 3), dims='nlayer')
+
+   params['Cv'] = xr.DataArray(np.copy(arr_veg_classes),
+                                 dims=('veg_class','nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc},
+                                 attrs={'description': "Fraction of grid cell covered by vegetation tile",
+                                        'units': "fraction", 'long_name': "Cv"},
+                                 encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['Nveg'] = xr.DataArray(np.copy(masknan_vals),
+                                   dims=('nj', 'ni'),
+                                   coords={'xc': domain.xc, 'yc': domain.yc},
+                                   attrs={'description': "Number of vegetation tiles in the grid cell", 
+                                          'units': "N/A", 'long_name': "Nveg"},
+                                   encoding={"_FillValue": fillval_i,
+                                               "Coordinates": "xc yc", 'dtype': 'int32'})
+   params['trunk_ratio'] = xr.DataArray(arr_veg_classes,
+                                 dims=('veg_class','nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc},
+                                 attrs={'description': "Ratio of total tree height that is trunk \
+                                 (no branches) \
+                                        The default value has been 0.2",
+                                 'units': "fraction", 'long_name': "Cv"},
+                                 encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['rarc'] = xr.DataArray(arr_veg_classes,
+                                 dims=('veg_class','nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc},
+                                 attrs={'description': "Architectural resistance of vegetation type \(~2 s/m)",
+                                        'units': "s/m", 'long_name': "rarc"},
+                                 encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['rmin'] = xr.DataArray(np.copy(arr_veg_classes),
+                                 dims=('veg_class','nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc},
+                                 attrs={'description': "Minimum stomatal resistance of vegetation type (~100 s/m)"},
+                                 encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['wind_h'] = xr.DataArray(np.copy(arr_veg_classes),
+                                 dims=('veg_class','nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc},
+                                 attrs={'description': "Height at which wind speed is measured",
+                                        'units': "m", 'long_name': "wind_h"},
+                                 encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['RGL'] = xr.DataArray(np.copy(arr_veg_classes),
+                                 dims=('veg_class','nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc},
+                                 attrs={'description': "Minimum incoming shortwave radiation at which there will be \
+                                        transpiration. For trees this is about 30 W/m^2, for crops about 100 W/m^2",
+                                        'units': "W/m^2", 'long_name': "RGL"},
+                                 encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+
+   params['rad_atten'] = xr.DataArray(arr_veg_classes,
+                                 dims=('veg_class','nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc},
+                                 attrs={'description': "Radiation attenuation factor. Normally set to 0.5, though may \
+                                        need to be adjusted for high latitudes",
+                                        'units': "fraction", 'long_name': "rad_atten"},
+                                 encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+
+   params['wind_atten'] = xr.DataArray(arr_veg_classes,
+                                 dims=('veg_class','nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc},
+                                 attrs={'description': "Wind speed attenuation through the overstory. The default value \
+                                        has been 0.5",
+                                        'units': "fraction", 'long_name': "wind_atten"},
+                                 encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   if max_snow_albedo == True:
+       params['max_snow_albedo'] = xr.DataArray(np.copy(arr_veg_classes),
+                                 dims=('veg_class','nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc},
+                                 attrs={'description': "maximum snow albedo from Barlage et al 2005",
+                                        'units': "fraction", 'long_name': "max_snow_albedo"},
+                                 encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['albedo'] = xr.DataArray(arr_veg_classes_month,
+                                         dims=('veg_class','month','nj', 'ni'),
+                                         coords={'xc': domain.xc, 'yc': domain.yc},
+                                         attrs={'description': "Shortwave albedo for vegetation type",
+                                                'units': "fraction", 'long_name': "albedo"},
+                                         encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['LAI'] = xr.DataArray(np.copy(arr_veg_classes_month),
+                                 dims=('veg_class','month','nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc, 'month': old_params.month},
+                                 attrs={'description': "Leaf Area Index, one per month",
+                                        'units': "N/A", 'long_name': "LAI"},
+                                 encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['overstory'] = xr.DataArray(arr_veg_classes,
+                                 dims=('veg_class','nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc},
+                                 attrs={'description': "Flag to indicate whether or not the current vegetation type \
+                                        has an overstory (TRUE for overstory present (e.g. trees), FALSE for \
+                                        overstory not present (e.g. grass))",
+                                        'units': "N/A", 'long_name': "overstory"},
+                                 encoding={"_FillValue": fillval_i,
+                                               "Coordinates": "xc yc", 'dtype': 'int32'})
+   params['displacement'] = xr.DataArray(np.copy(arr_veg_classes_month), 
+                                         dims=('veg_class','month','nj', 'ni'),
+                                         coords={'month': old_params['month'], 'xc': domain.xc, 
+                                                 'yc': domain.yc},
+                                         attrs={'description': "Vegetation displacement height (typically 0.67 \
+                                                * vegetation height)",
+                                                'units': "m", 'long_name': "displacement"},
+                                         encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['veg_rough'] = xr.DataArray(np.copy(arr_veg_classes_month),
+                                         dims=('veg_class','month','nj', 'ni'),
+                                         coords={'xc': domain.xc, 'yc': domain.yc},
+                                         attrs={'description': "Vegetation roughness length (typically 0.123 \
+                                                * vegetation height)",
+                                                'units': "m", 'long_name': "veg_rough"},
+                                         encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['elev'] = xr.DataArray(np.copy(masknan_vals),
+                                dims=('nj', 'ni'),
+                                coords={'xc': domain.xc, 'yc': domain.yc},
+                                attrs={'description': "Average elevation of grid cell", 
+                                              'units': "m", 'long_name': "elev"},
+                                encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['avg_T'] = xr.DataArray(np.copy(masknan_vals),
+                                dims=('nj', 'ni'),
+                                coords={'xc': domain.xc, 'yc': domain.yc},
+                                attrs={'description': "Average soil temperature, used as the bottom boundary \
+                                        for soil heat flux solutions", 
+                                        'units': "C", 'long_name': "avg_T"},
+                                encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['annual_prec'] = xr.DataArray(np.copy(masknan_vals),
+                                dims=('nj', 'ni'),
+                                coords={'xc': domain.xc, 'yc': domain.yc},
+                                attrs={'description': "Average annual precipitation", 
+                                              'units': "mm", 'long_name': "annual_prec"},
+                                encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['rough'] = xr.DataArray(np.copy(masknan_vals),
+                                dims=('nj', 'ni'),
+                                coords={'xc': domain.xc, 'yc': domain.yc},
+                                attrs={'description': "Surface roughness of bare soil", 
+                                              'units': "m", 'long_name': "rough"},
+                                encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['root_depth'] = xr.DataArray(np.copy(arr_veg_classes_rootzone),
+                                         dims=('veg_class','root_zone','nj', 'ni'),
+                                         coords={'xc': domain.xc, 'yc': domain.yc},
+                                         attrs={'description': "Root zone thickness (sum of depths is total depth of \
+                                                 root penetration)",
+                                                'units': "m", 'long_name': "root_depth"},
+                                         encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['root_fract'] = xr.DataArray(np.copy(arr_veg_classes_rootzone),
+                                         dims=('veg_class','root_zone','nj', 'ni'),
+                                         coords={'xc': domain.xc, 'yc': domain.yc},
+                                         attrs={'description': "Fraction of root in the current root zone",
+                                                'units': "fraction", 'long_name': "root_fract"},
+                                         encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['Ds'] = xr.DataArray(np.copy(masknan_vals),
+                              dims=('nj', 'ni'),
+                              coords={'xc': domain.xc, 'yc': domain.yc},
+                              attrs={'description': "Fraction of Dsmax where non-linear baseflow begins", 
+                                         'units': "fraction", 'long_name': "Ds"},
+                                 encoding={"_FillValue": fillval_f,
+                                           "Coordinates": "xc yc"})
+   params['Dsmax'] = xr.DataArray(np.copy(masknan_vals),
+                              dims=('nj', 'ni'),
+                              coords={'xc': domain.xc, 'yc': domain.yc},
+                              attrs={'description': "Fraction of maximum soil moisture where non-linear baseflow occurs", 
+                                              'units': "fraction", 'long_name': "Dsmax"},
+                                 encoding={"_FillValue": fillval_f,
+                                           "Coordinates": "xc yc"})
+   params['Ws'] = xr.DataArray(np.copy(masknan_vals),
+                              dims=('nj', 'ni'),
+                              coords={'xc': domain.xc, 'yc': domain.yc},
+                              attrs={'description': "Fraction of maximum soil moisture where non-linear baseflow occurs", 
+                                              'units': "fraction", 'long_name': "Ws"},
+                                 encoding={"_FillValue": fillval_f,
+                                           "Coordinates": "xc yc"})
+   params['c'] = xr.DataArray(np.copy(masknan_vals),
+                           dims=('nj', 'ni'),
+                           coords={'xc': domain.xc, 'yc': domain.yc},
+                           attrs={'description': "Exponent used in baseflow curve, normally set to 2", 
+                                      'units': "N/A", 'long_name': "c"},
+                           encoding={"_FillValue": fillval_f,
+                                  "Coordinates": "xc yc"})
+   params['infilt'] = xr.DataArray(np.copy(masknan_vals),
+                              dims=('nj', 'ni'),
+                              coords={'xc': domain.xc, 'yc': domain.yc},
+                              attrs={'description': "Fraction of maximum soil moisture where non-linear baseflow occurs", 
+                                              'units': "fraction", 'long_name': "infilt"},
+                                 encoding={"_FillValue": fillval_f,
+                                           "Coordinates": "xc yc"})
+   params['depth'] = xr.DataArray(np.copy(arr_nlayer),
+                                dims=('nlayer','nj', 'ni'),
+                                coords={'xc': domain.xc, 'yc': domain.yc},
+                                attrs={'description': "Thickness of each soil moisture layer",
+                                   'units': "m", 'long_name': "depth"},
+                                encoding={"_FillValue": fillval_f,
+                                       "Coordinates": "xc yc"})
+   params['Ksat'] = xr.DataArray(np.copy(arr_nlayer), 
+                              dims=('nlayer','nj', 'ni'),
+                              coords={'xc': domain.xc, 'yc': domain.yc},
+                              attrs={'description': "Saturated hydraulic conductivity",
+                                       'units': "mm/day", 'long_name': "Ksat"},
+                              encoding={"_FillValue": fillval_f,
+                                         "Coordinates": "xc yc"})
+   params['bulk_density'] = xr.DataArray(np.copy(arr_nlayer),
+                                      dims=('nlayer','nj', 'ni'),
+                                      coords={'xc': domain.xc, 'yc': domain.yc},
+                                      attrs={'description': "Mineral bulk density of soil layer",
+                                             'units': "kg/m3", 'long_name': "bulk_density"},
+                                      encoding={"_FillValue": fillval_f,
+                                             "Coordinates": "xc yc"})
+   params['expt'] = xr.DataArray(np.copy(arr_nlayer),
+                                   dims=('nlayer','nj', 'ni'),
+                                   coords={'xc': domain.xc, 'yc': domain.yc},
+                                   attrs={'description': "Exponent n (=3+2/lambda) in Campbell's eqt for Ksat, HBH 5.6 \
+                                           where lambda = soil pore size distribution parameter", 
+                                           'units': "N/A", 'long_name': "expt"},
+                                   encoding={"_FillValue": fillval_f,
+                                             "Coordinates": "xc yc"})
+   params['bubble'] = xr.DataArray(np.copy(arr_nlayer),
+                                         dims=('nlayer','nj', 'ni'),
+                                         coords={'xc': domain.xc, 'yc': domain.yc},
+                                         attrs={'description': "Bubbling pressure of soil. Values should be > 0",
+                                           'units': "cm", 'long_name': "bubble"},
+                                     encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['resid_moist'] = xr.DataArray(np.copy(arr_nlayer),
+                                         dims=('nlayer','nj', 'ni'),
+                                         coords={'xc': domain.xc, 'yc': domain.yc},
+                                         attrs={'description': "Soil moisture layer residual moisture",
+                                           'units': "fraction", 'long_name': "resid_moist"},
+                                         encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['quartz'] = xr.DataArray(np.copy(arr_nlayer),
+                                dims=('nlayer','nj', 'ni'),
+                                coords={'xc': domain.xc, 'yc': domain.yc},
+                                attrs={'description': "Quartz content of soil",
+                                       'units': "cm", 'long_name': "quartz"},
+                                encoding={"_FillValue": fillval_f,
+                                       "Coordinates": "xc yc"})
+   if bulk_density_comb == True:
+      params['bulk_density_comb'] = xr.DataArray(np.copy(arr_nlayer),
+                                      dims=('nlayer','nj', 'ni'),
+                                      coords={'xc': domain.xc, 'yc': domain.yc},
+                                      attrs={'description': "Soil bulk density of soil layer",
+                                             'units': "kg/m3", 'long_name': "bulk_density"},
+                                      encoding={"_FillValue": fillval_f,
+                                             "Coordinates": "xc yc"})
+   if organic_fract == True:
+      params['organic'] = xr.DataArray(np.copy(arr_nlayer),
+                                      dims=('nlayer','nj', 'ni'),
+                                      coords={'xc': domain.xc, 'yc': domain.yc},
+                                      attrs={'description': "soil organic carbon fraction",
+                                             'units': "fraction", 'long_name': "organic_fract"},
+                                      encoding={"_FillValue": fillval_f,
+                                             "Coordinates": "xc yc"})
+   params['soil_density'] = xr.DataArray(np.copy(arr_nlayer),
+                                      dims=('nlayer','nj', 'ni'),
+                                      coords={'xc': domain.xc, 'yc': domain.yc},
+                                      attrs={'description': "Soil particle density, normally 2685 kg/m3",
+                                       'units': "kg/m3", 'long_name': "soil_density"},
+                                      encoding={"_FillValue": fillval_f,
+                                           "Coordinates": "xc yc"})
+   if organic_fract == True:
+      params['soil_density_org'] = xr.DataArray(np.copy(arr_nlayer),
+                                      dims=('nlayer','nj', 'ni'),
+                                      coords={'xc': domain.xc, 'yc': domain.yc},
+                                      attrs={'description': "Organic matter particle density, normally 1300 kg/m3",
+                                       'units': "kg/m3", 'long_name': "soil_dens_org"},
+                                      encoding={"_FillValue": fillval_f,
+                                           "Coordinates": "xc yc"})
+   params['Wpwp_FRACT'] = xr.DataArray(np.copy(arr_nlayer),
+                                         dims=('nlayer','nj', 'ni'),
+                                         coords={'xc': domain.xc, 'yc': domain.yc},
+                                         attrs={'description': "Fractional soil moisture content at the \
+                                                wilting point (fraction of maximum moisture)",
+                                           'units': "fraction", 'long_name': "Wpwp_FRACT"},
+                                         encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['Wcr_FRACT'] = xr.DataArray(np.copy(arr_nlayer),
+                                         dims=('nlayer','nj', 'ni'),
+                                         coords={'xc': domain.xc, 'yc': domain.yc},
+                                         attrs={'description': "Fractional soil moisture content at the critical point \
+                                                (~70%% of field capacity) (fraction of maximum moisture)",
+                                           'units': "fraction", 'long_name': "Wcr_FRACT"},
+                                         encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['init_moist'] = xr.DataArray(np.copy(arr_nlayer),
+                                     dims=('nlayer','nj', 'ni'),
+                                     coords={'xc': domain.xc, 'yc': domain.yc},
+                                     attrs={'description': "Initial layer moisture content",
+                                           'units': "mm", 'long_name': "init_moist"},
+                                     encoding={"_FillValue": fillval_f,
+                                             "Coordinates": "xc yc"})
+   params['off_gmt'] = xr.DataArray(np.copy(masknan_vals),
+                                 dims=('nj', 'ni'),
+                                 coords={'xc': domain.xc, 'yc': domain.yc},
+                                 encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['phi_s'] = xr.DataArray(np.copy(arr_nlayer),
+                                    dims=('nlayer','nj', 'ni'),
+                                    coords={'xc': domain.xc, 'yc': domain.yc},
+                                    attrs={'description': "Soil moisture diffusion parameter",
+                                           'units': "mm/mm", 'long_name': "phi_s"},
+                                    encoding={"_FillValue": fillval_f,
+                                              "Coordinates": "xc yc"})
+   params['fs_active'] = xr.DataArray(np.copy(masknan_vals),
+                                dims=('nj', 'ni'),
+                                coords={'xc': domain.xc, 'yc': domain.yc},
+                                attrs={'description': "If set to 1, then frozen soil algorithm is activated for the \
+                                        grid cell. A 0 indicates that frozen soils are not computed if soil \
+                                        temperatures fall below 0C.", 
+                                        'units': "binary", 'long_name': "fs_active"},
+                                encoding={"_FillValue": fillval_i,
+                                               "Coordinates": "xc yc", 'dtype': 'int32'})
+   params['dp'] = xr.DataArray(np.copy(masknan_vals),
+                                dims=('nj', 'ni'),
+                                coords={'xc': domain.xc, 'yc': domain.yc},
+                                attrs={'description': "Soil thermal damping depth (depth at which soil temperature) \
+                                        remains constant through the year, ~4 m", 
+                                              'units': "m", 'long_name': "dp"},
+                                encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['snow_rough'] = xr.DataArray(np.copy(masknan_vals),
+                                    dims=('nj', 'ni'),
+                                    coords={'xc': domain.xc, 'yc': domain.yc},
+                                    attrs={'description': "Surface roughness of snowpack", 
+                                              'units': "m", 'long_name': "snow_rough"},
+                                    encoding={"_FillValue": fillval_f,
+                                               "Coordinates": "xc yc"})
+   params['run_cell'] = xr.DataArray(np.copy(masknan_vals), 
+                                       dims=('nj', 'ni'),
+                                       coords={'xc': domain.xc, 'yc': domain.yc},
+                                       attrs={'units': "N/A", 'long_name': "run_cell"},
+                                       encoding={"_FillValue": fillval_i,
+                                                 "Coordinates": "xc yc",
+                                                 "dtype": "int32"})
+   params['mask'] = xr.DataArray(np.copy(masknan_vals),
+                                   dims=('nj', 'ni'),
+                                   coords={'xc': domain.xc, 'yc': domain.yc},
+                                   attrs={'description': "0 value indicates cell is not active", 
+                                          'units': "N/A", 'long_name': "mask", 'bounds': 'yv'},
+                                   encoding={"_FillValue": fillval_i,
+                                                 "Coordinates": "xc yc",
+                                                 "dtype": "int32"})
+   params['gridcell'] = xr.DataArray(np.copy(masknan_vals), 
+                                       dims=('nj', 'ni'),
+                                       coords={'xc': domain.xc, 'yc': domain.yc},
+                                       attrs={'description': "Grid cell number", 
+                                              'units': "N/A", 'long_name': "gridcell"},
+                                       encoding={"_FillValue": fillval_i,
+                                                 "Coordinates": "xc yc", "dtype": "int32"})
+   params['lats'] = xr.DataArray(np.copy(masknan_vals), 
+                                   dims=('nj', 'ni'),
+                                   coords={'xc': domain.xc, 'yc': domain.yc},
+                                   attrs={'description': "Latitude of grid cell", 
+                                              'units': "degrees", 'long_name': "lats"})
+   params['lons'] = xr.DataArray(np.copy(masknan_vals),
+                                   dims=('nj', 'ni'),
+                                   coords={'xc': domain.xc, 'yc': domain.yc},
+                                   attrs={'description': "Longitude of grid cell", 
+                                          'units': "degrees", 'long_name': "lons"})
+   params['xc'] = xr.DataArray(np.copy(masknan_vals),
+                                 dims=('nj', 'ni'),
+                                 attrs={'units': "degrees_east", 'long_name': "longitude of gridcell center",
+                                        'bounds': 'xv'})
+   params['yc'] = xr.DataArray(np.copy(masknan_vals),
+                                 dims=('nj', 'ni'),
+                                 attrs={'units': "degrees_north", 'long_name': "latitude of gridcell center",
+                                        'bounds': 'yv'})
+   domain = domain.rename({'nv': 'nv4'})
+   params['xv'] = xr.DataArray(np.rollaxis(domain['xv'].values, axis=2),
+                                 dims=('nv4', 'nj', 'ni'),
+                                 attrs={'units': "degrees_east", 
+                                        'long_name': "longitude of grid cell vertices"})
+   params['yv'] = xr.DataArray(np.rollaxis(domain['yv'].values, axis=2),
+                                 dims=('nv4', 'nj', 'ni'),
+                                 attrs={'units': "degrees_north", 
+                                        'long_name': "latitude of grid cell vertices"})
+   return(params)

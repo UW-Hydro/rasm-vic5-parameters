@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -N vh_25km
+#PBS -N vh_ncar
 #PBS -q parallel
 #PBS -A NPSCA07935YF5
 #PBS -l select=2:ncpus=32:mpiprocs=8:mem=200GB
@@ -15,7 +15,7 @@ source activate pangeo
 
 ############################################################################################################################
 # grid options: 50km: wr50a_ar9v4, 25km: wr25b_ar9v4, 12km: ncar
-grid="wr25b_ar9v4"
+grid="ncar"
 ############################################################################################################################
 
 if [ "$grid" == "wr50a_ar9v4" ]

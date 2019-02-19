@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -N lai_25km
+#PBS -N lai_ncar
 #PBS -q parallel
 #PBS -A NPSCA07935YF5
 #PBS -l select=2:ncpus=32:mpiprocs=8:mem=200GB
@@ -14,7 +14,7 @@ source activate pangeo
 # regrid LAI to domain file listed 
 
 # grid options: 50km: wr50a_ar9v4, 25km: wr25b_ar9v4, 12km: ncar
-grid="wr25b_ar9v4"
+grid="ncar"
 
 if [ "$grid" == "wr50a_ar9v4" ]
 then
