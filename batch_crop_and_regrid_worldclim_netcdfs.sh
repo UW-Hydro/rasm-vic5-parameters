@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N worldclim
-#PBS -q serial
+#PBS -q x11
 #PBS -A NPSCA07935YF5
 #PBS -l select=1:ncpus=32:mpiprocs=8:mem=200GB
 #PBS -l walltime=04:00:00
@@ -13,13 +13,26 @@ source activate pangeo
 
 # process WorldClim NetCDFs by cropping them and then regridding them
 
-#declare -a clim_variables=("tavg" "prec")
-declare -a clim_variables=("tavg")
+declare -a clim_variables=("tavg" "prec")
+#declare -a clim_variables=("tavg")
 
 declare -a month_nums=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "11" "12")
-###################################################################################### change domain file if needed ###########################################################
-domain_file="/u/home/gergel/data/parameters/domain.lnd.wr50a_ar9v4.100920.nc"
-###############################################################################################################################################################################
+
+# grid options: 50km: wr50a_ar9v4, 25km: wr25b_ar9v4
+grid="wr25b_ar9v4"
+# res options: 50km, 25km 
+res="25km"
+
+if [ "$grid" == "wr50a_ar9v4" ]
+then
+        domain_file="/u/home/gergel/data/parameters/domain.lnd.wr50a_ar9v4.100920.nc"
+elif [ "$grid" == "wr25b_ar9v4" ]
+then
+        domain_file="/u/home/gergel/data/parameters/domain.lnd.wr25b_ar9v4.170413.nc"
+else
+        echo "this hasn't been defined yet"
+fi
+
 
 for file_type in ${clim_variables[@]} 
 do	
@@ -33,9 +46,9 @@ do
 		cdo sellonlatbox,-180,180,15,90 $filename $crop_file
 
 		# regrid file
-		tmp1="/u/home/gergel/data/parameters/world_clim_data/50km/${file_type}_${month_num}_tmp.nc"
-		tmp2="/u/home/gergel/data/parameters/world_clim_data/50km/${file_type}_${month_num}_wr50a_ar9v4_tmp.nc"
-		regrid_file="/u/home/gergel/data/parameters/world_clim_data/50km/${file_type}_${month_num}_wr50a_ar9v4.nc"
+		tmp1="/u/home/gergel/data/parameters/world_clim_data/${res}/${file_type}_${month_num}_tmp.nc"
+		tmp2="/u/home/gergel/data/parameters/world_clim_data/${res}/${file_type}_${month_num}_${grid}_tmp.nc"
+		regrid_file="/u/home/gergel/data/parameters/world_clim_data/${res}/${file_type}_${month_num}_${grid}.nc"
 
 		# set fillvalues to missing values to avoid incorrect remapping of coastal gridcells, 
 		# solution adapted from https://code.mpimet.mpg.de/boards/2/topics/6172?r=6199

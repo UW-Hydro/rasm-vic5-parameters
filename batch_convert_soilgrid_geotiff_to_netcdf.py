@@ -17,12 +17,14 @@ direc = '/u/home/gergel/data/parameters/soil_data/geotiffs'
 d = OrderedDict()
 # add soil variables that will need to be processed
 # %s needs to be filled in for soil layer, goes up to 7
-#d['bulk_density'] = "BLDFIE_M_sl%s_1km_ll.tif" 
-d['clay'] = "CLYPPT_M_sl%s_1km_ll.tif"
-d['sand'] = "SNDPPT_M_sl%s_1km_ll.tif"
-d['silt'] = "SLTPPT_M_sl%s_1km_ll.tif"
-d['coarse'] = "CRFVOL_M_sl%s_1km_ll.tif"
+d['bulk_density'] = "BLDFIE_M_sl%s_5km_ll.tif" 
+d['clay'] = "CLYPPT_M_sl%s_5km_ll.tif"
+d['sand'] = "SNDPPT_M_sl%s_5km_ll.tif"
+d['silt'] = "SLTPPT_M_sl%s_5km_ll.tif"
+d['coarse'] = "CRFVOL_M_sl%s_5km_ll.tif"
 d['bedrock'] = "BDTICM_M_1km_ll.tif"
+d['organic_fract'] = "OCDENS_M_sl%s_5km_ll.tif"
+d['soil_class'] = "TAXNWRB_5km_ll.tif"
 
 d_varnames = OrderedDict()
 d_varnames['bulk_density'] = "BLDFIE"
@@ -31,14 +33,21 @@ d_varnames['sand'] = "SNDPPT"
 d_varnames['silt'] = "SLTPPT"
 d_varnames['coarse'] = "CRFVOL"
 d_varnames['bedrock'] = "BDTICM"
+d_varnames['organic_fract'] = "OCDENS"
+d_varnames['soil_class'] = "TAXNWRB"
 
 for key, items in d.items():
-	if key != "bedrock":
+	if key != "bedrock" and key != "soil_class":
 		upper_range = 8
 	else: 
 		upper_range = 2
 	for file_num in range(1, upper_range):
-		filename = items %file_num
+
+		if key != "bedrock" and key != "soil_class":
+			filename = items %file_num
+		else: 
+			filename = items
+
 		file = os.path.join(direc, filename)
 			
 		# open as DataArray
