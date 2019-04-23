@@ -18,7 +18,6 @@ filename = os.path.join(config['Hydroclimate']['dir'],
                         config['Hydroclimate']['brown_filename'])
 		
 # regrid file
-regrid_file="/u/home/gergel/data/parameters/brown_permafrost/NCSCDv2_Circumpolar_WGS84_pfregion_extent_005deg_${grid}.nc"
 regrid_file = os.path.join(outdir, 'NCSCDv2_Circumpolar_WGS84_pfregion_extent_005deg_%s.nc' %grid)
 
 #cdo remapnn,$domain_file $filename $regrid_file

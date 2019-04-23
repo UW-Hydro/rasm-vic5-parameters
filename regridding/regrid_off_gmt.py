@@ -14,8 +14,6 @@ grid = config['Parameter Specs']['grid']
 res = config['Parameter Specs']['res']
 outdir = config['Parameter Specs']['output_dir']
 
-filename="/u/home/gergel/data/vic_params_wr50a_vic5.0.dev_20160328.nc"
-
 filename = os.path.join(config['Other']['dir'],
                         config['Other']['off_gmt_filename'])
 

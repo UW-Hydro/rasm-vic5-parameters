@@ -14,7 +14,6 @@ grid = config['Parameter Specs']['grid']
 res = config['Parameter Specs']['res']
 outdir = config['Parameter Specs']['output_dir']
 
-filename="/u/home/gergel/data/parameters/lai/mksrf_lai_78pfts_simyr2005.c170413_mod_fillval.nc"
 filename = os.path.join(config['Vegetation']['dir'],
                         config['Vegetation']['filename'])
 		
