@@ -31,8 +31,7 @@ cdo.setmisstonn(input=tmp1, output=tmp2)
 
 # remap both land and ocean gridcells so that coastal gridcells are assigned valid values
 # cdo remapnn,$domain_file $tmp2 $regrid_file
-cdo.remapnn(domain, input=tmp2, output=tmp2)
-echo "successfully regridded off_gmt from 50km parameter file"     
+cdo.remapnn(domain, input=tmp2, output=regrid_file)
 
 # remove temp files
 rm_files = [crop_file, tmp1, tmp2]
