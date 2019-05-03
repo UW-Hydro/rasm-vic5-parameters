@@ -9,9 +9,14 @@ import cartopy.crs as ccrs
 from rasterio.warp import transform
 from collections import OrderedDict
 import netCDF4
+import configparser
+
+config = configparser.ConfigParser()
+config.read('regridding.cfg')
 
 # directory for soil files
-direc = '/u/home/gergel/data/parameters/soil_data/geotiffs'
+direc = config['Soil Data']['geotiff_dir']
+netcdf_direc = config['Soil Data']['netcdf_dir']
 
 # dict of soil files to process
 d = OrderedDict()
@@ -77,7 +82,6 @@ for key, items in d.items():
                                  	 coords={'lon': ds['xc'], 
                                          'lat': ds['yc']})
 		# write dataset to netcdf
-		netcdf_direc = "/u/home/gergel/data/parameters/soil_data/netcdfs"
 		netcdf_filename = "%s_sl%s.nc" %(key, file_num)
 		savepath = os.path.join(netcdf_direc, netcdf_filename)
 		ds.to_netcdf(savepath, encoding={key: {'dtype': 'float'}},

@@ -9,11 +9,16 @@ import cartopy.crs as ccrs
 from rasterio.warp import transform
 from collections import OrderedDict
 import netCDF4
+import configparser
+
+config = configparser.ConfigParser()
+config.read('regridding.cfg')
 
 # directory for World Clim data
 # downloaded from World Clim site, http://worldclim.org/version2, 10min global data, 
 # 1 file for each month, 1970-2000 averages
-direc = '/u/home/gergel/data/parameters/world_clim_data'
+direc = config['WorldClim'['geotiff_dir']
+netcdf_direc = config['WorldClim']['netcdf_dir']
 
 # dict of temp and precip files to process
 d = OrderedDict()
@@ -57,7 +62,6 @@ for key, items in d.items():
                                  	 coords={'lon': ds['xc'], 
                                          'lat': ds['yc']})
 		# write dataset to netcdf
-		netcdf_direc = "/u/home/gergel/data/parameters/world_clim_data/netcdfs"
 		netcdf_filename = "%s_%s.nc" %(key, month_num)
 		savepath = os.path.join(netcdf_direc, netcdf_filename)
 		ds.to_netcdf(savepath, encoding={key: {'dtype': 'float'}},
