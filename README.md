@@ -8,9 +8,9 @@ Steps to derive parameters:
 including corresponding scripts for regridding. Some base datasets will need to be converted from GeoTiffs to NetCDFs before usage, and scripts to regrid those files (the WorldClim and SoilsGrid data) are located in the home directory of this repo. Other regridding scripts are located in `~/regridding`: 
     1. ISRIC Soil Data: `regrid_isric_soildata.py`
     1. PFTs (vegetation types): `regrid_pfts.py`
-    1. vegetation height: `regrid_veg_height.py`
+    1. Vegetation height: `regrid_veg_height.py`
     1. LAI: `regrid_lai.py` 
-    1. precipitation and temperature: `regrid_worldclim.py`
+    1. Precipitation and temperature: `regrid_worldclim.py`
     1. GTOPO elevation: `regrid_gtopo.py`
     1. Koppen-Geiger hydroclimate class: `regrid_koppengeiger.py` 
     1. Brown permafrost data: `regrid_brown_permafrost.py`
