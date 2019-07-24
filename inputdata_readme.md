@@ -9,7 +9,7 @@ Required data inputs and their categories:
 	4. sand content: tp://ftp.soilgrids.org/data/aggregated/1km/SNDPPT_M_sl1_1km_ll.tif (download for all 7 layers, e.g. sl1-7)
 	5. clay content: ftp://ftp.soilgrids.org/data/aggregated/1km/CLYPPT_M_sl1_1km_ll.tif (download for all 7 layers, e.g. sl1-7)
 	6. bulk density: ftp://ftp.soilgrids.org/data/aggregated/1km/BLDFIE_M_sl1_1km_ll.tif (download for all 7 layers, e.g. sl1-7)
-2. __LAI and Vegetation Height__: 0.05-degree global product obtained from Peter Lawrence and Dave Lawrence at the Climate and Global Dynamics group, National Center for Atmospheric Research. Emails: Dave Lawrence (dlawren@ucar.edu), Peter Lawrence (lawrence@ucar.edu)
+2. __LAI and Vegetation Height__: 0.05-degree global product obtained from Peter Lawrence and Dave Lawrence at the Climate and Global Dynamics group, National Center for Atmospheric Research.
 3. __Vegetation Classes__ (Plant Functional Types used in CLM): same source as for LAI and Vegetation Height, 0.05-degree global product
 4. __Elevation data__: 
 	1. GTOPO 0.05-deg elevation map, available through Oak Ridge National Lab (required EarthData registration for download): https://webmap.ornl.gov/ogc/dataset.jsp?dg_id=10003_1
